@@ -4,12 +4,11 @@ require("dotenv").config();
 
 const app = express();
 
-// ===== ENV =====
+// ===== CONFIG =====
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
 
-// Your server ID
 const GUILD_ID = "1508238624808894566";
 
 // ===== HOME =====
@@ -17,7 +16,7 @@ app.get("/", (req, res) => {
   res.send("Backend alive");
 });
 
-// ===== LOGIN REDIRECT =====
+// ===== LOGIN =====
 app.get("/auth/discord", (req, res) => {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -26,17 +25,18 @@ app.get("/auth/discord", (req, res) => {
     scope: "identify guilds",
   });
 
-  res.redirect(`https://discord.com/oauth2/authorize?${params.toString()}`);
+  res.redirect(
+    `https://discord.com/oauth2/authorize?${params.toString()}`
+  );
 });
 
-// ===== CALLBACK =====
+// ===== CALLBACK (THIS IS THE FIXED PART) =====
 app.get("/auth/discord/callback", async (req, res) => {
   const code = req.query.code;
-
   if (!code) return res.send("No code received");
 
   try {
-    // Exchange code for token
+    // exchange code for token
     const tokenRes = await axios.post(
       "https://discord.com/api/oauth2/token",
       new URLSearchParams({
@@ -55,7 +55,7 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     const accessToken = tokenRes.data.access_token;
 
-    // Get user info
+    // get user
     const userRes = await axios.get(
       "https://discord.com/api/users/@me",
       {
@@ -65,31 +65,19 @@ app.get("/auth/discord/callback", async (req, res) => {
       }
     );
 
-    // Get guild list
-    const guildsRes = await axios.get(
-      "https://discord.com/api/users/@me/guilds",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
+    const username = userRes.data.username;
+
+    // FINAL REDIRECT BACK TO YOUR SITE
+    return res.redirect(
+      `https://n-0tpurplx.github.io/Community-Manager-Lite/?auth=success&user=${encodeURIComponent(username)}`
     );
 
-    const inGuild = guildsRes.data.some(g => g.id === GUILD_ID);
-
-    if (!inGuild) {
-      return res.send("❌ You are not in the server");
-    }
-
-    res.send(`
-      <h1>Login Successful</h1>
-      <p>User: ${userRes.data.username}</p>
-      <p>Status: AUTHORIZED</p>
-    `);
-
   } catch (err) {
-    console.log(err.response?.data || err.message);
-    res.send("Auth failed");
+    console.log(err.message);
+
+    return res.redirect(
+      `https://n-0tpurplx.github.io/Community-Manager-Lite/?auth=failed`
+    );
   }
 });
 
