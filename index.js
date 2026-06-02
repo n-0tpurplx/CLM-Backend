@@ -4,25 +4,24 @@ require("dotenv").config();
 
 const app = express();
 
-// ===== CONFIG =====
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
 
 const GUILD_ID = "1508238624808894566";
 
-// ===== HEALTH CHECK =====
+// Home
 app.get("/", (req, res) => {
   res.send("Backend alive");
 });
 
-// ===== STEP 1: REDIRECT TO DISCORD =====
+// STEP 1: redirect to Discord
 app.get("/auth/discord", (req, res) => {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
     response_type: "code",
-    scope: "identify guilds"
+    scope: "identify guilds",
   });
 
   res.redirect(
@@ -30,14 +29,14 @@ app.get("/auth/discord", (req, res) => {
   );
 });
 
-// ===== STEP 2: CALLBACK =====
+// STEP 2: callback
 app.get("/auth/discord/callback", async (req, res) => {
   const code = req.query.code;
 
-  if (!code) return res.send("No code provided");
+  if (!code) return res.send("No code received");
 
   try {
-    // 1. Exchange code for token
+    // exchange code → token
     const tokenRes = await axios.post(
       "https://discord.com/api/oauth2/token",
       new URLSearchParams({
@@ -56,17 +55,14 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     const accessToken = tokenRes.data.access_token;
 
-    // 2. Get user info
-    const userRes = await axios.get(
-      "https://discord.com/api/users/@me",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    // get user
+    const userRes = await axios.get("https://discord.com/api/users/@me", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-    // 3. Check guild membership
+    // get guilds
     const guildsRes = await axios.get(
       "https://discord.com/api/users/@me/guilds",
       {
@@ -78,12 +74,15 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     const inGuild = guildsRes.data.some(g => g.id === GUILD_ID);
 
-    // ===== RESPONSE =====
+    if (!inGuild) {
+      return res.send("❌ You are not in the server");
+    }
+
     res.send(`
-      <h1>Login Successful</h1>
+      <h1>Login successful</h1>
       <p>User: ${userRes.data.username}</p>
-      <p>Guild Access: ${inGuild ? "YES" : "NO"}</p>
-      <p>Next step: role checking (bot needed)</p>
+      <p>Server access: YES</p>
+      <p>Status: AUTHENTICATED</p>
     `);
 
   } catch (err) {
@@ -92,7 +91,5 @@ app.get("/auth/discord/callback", async (req, res) => {
   }
 });
 
-// ===== START SERVER =====
-app.listen(3000, () => {
-  console.log("Server running");
-});
+// start
+app.listen(3000, () => console.log("Running"));
