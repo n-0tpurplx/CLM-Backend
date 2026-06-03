@@ -85,38 +85,39 @@ app.post("/command", async (req, res) => {
   const { command } = req.body;
 
   if (!command) {
-    return res.json({ success: false, error: "No command provided" });
+    return res.status(400).json({
+      error: "No command provided"
+    });
   }
 
   try {
-    // SEND TO ERLC API
-    const response = await axios.post(
-      "https://api.policeroleplay.community/v2/server/command",
+    const response = await fetch(
+      "https://api.erlc.gg/v2/server/command",
       {
-        command: command
-      },
-      {
+        method: "POST",
         headers: {
-          "server-key": ERLC_API_KEY,
+          "server-key": process.env.ERLC_API_KEY,
           "Content-Type": "application/json"
-        }
+        },
+        body: JSON.stringify({
+          command: command
+        })
       }
     );
 
-    return res.json({
-      success: true,
-      data: response.data
-    });
+    const data = await response.json();
+
+    console.log("ERLC RESPONSE:", data);
+
+    res.json(data);
 
   } catch (err) {
-    console.log(err.response?.data || err.message);
+    console.error("ERLC ERROR:", err);
 
-    return res.json({
-      success: false,
-      error: "ERLC API request failed"
+    res.status(500).json({
+      error: "Failed to send command"
     });
   }
 });
-
 // ===== START SERVER =====
 app.listen(3000, () => console.log("Running"));
